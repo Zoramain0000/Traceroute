@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ZeroTrace 100 Hop</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<video autoplay muted loop id="bg-video">
+  <source src="ca63eccfcf11bcd02c1a900196de630f_720w.mp4" type="video/mp4">
+</video>
+
+<div class="overlay"></div>
+
+<div class="container">
+  <h1>⚡ ZERO TRACE 100 HOP</h1>
+
+  <input type="text" id="host" placeholder="Enter Domain or IP">
+  <button onclick="startTrace()">TRACE</button>
+
+  <div id="results"></div>
+  <canvas id="topology"></canvas>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

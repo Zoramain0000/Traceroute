@@ -3,308 +3,752 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HackerAI Live IP Recon Scanner</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>INFINITE TRACEROUTE v3.0 - Authorized Pentest</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Fira+Code:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Courier New', monospace; 
-            background: #000; 
-            color: #00ff00; 
+        :root {
+            --neon-green: #00ff88;
+            --neon-purple: #ff00ff;
+            --neon-blue: #00ccff;
+            --dark-bg: #0a0a0f;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Fira Code', monospace;
+            background: var(--dark-bg);
+            color: var(--neon-green);
             overflow: hidden;
             height: 100vh;
+            cursor: none;
         }
-        #video-bg {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover; z-index: -2;
-            filter: brightness(0.25) contrast(1.3) saturate(0.7);
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
         }
-        #map-container {
-            height: 70vh; width: 100%; position: relative; 
-            border: 2px solid #00ff00; box-shadow: 0 0 30px #00ff0080;
+
+        #bg-video {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            opacity: 0.22;
+            filter: hue-rotate(200deg) saturate(1.4) contrast(1.3);
         }
-        #map { height: 100%; width: 100%; }
-        .control-panel {
-            position: absolute; top: 10px; left: 10px; z-index: 1000;
-            background: rgba(0,0,0,0.92); border: 1px solid #00ff00;
-            padding: 20px; border-radius: 10px; backdrop-filter: blur(20px);
-            box-shadow: 0 0 40px #00ff0060;
+
+        #renderer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
         }
+
+        .hud {
+            position: fixed;
+            z-index: 10;
+            pointer-events: none;
+            font-weight: 300;
+        }
+
+        .panel {
+            background: rgba(10, 10, 15, 0.95);
+            backdrop-filter: blur(25px);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: 12px;
+            padding: 24px;
+            margin: 24px;
+            box-shadow: 
+                0 0 50px rgba(0, 255, 136, 0.2),
+                inset 0 0 20px rgba(0, 255, 136, 0.05);
+            pointer-events: auto;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        #command-panel {
+            top: 24px;
+            left: 24px;
+            min-width: 320px;
+        }
+
+        #metrics-panel {
+            top: 24px;
+            right: 24px;
+            min-width: 280px;
+        }
+
+        #trace-panel {
+            bottom: 24px;
+            left: 24px;
+            min-width: 420px;
+            max-height: 280px;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 12px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(0, 255, 136, 0.1);
+        }
+
+        .metric-label {
+            opacity: 0.8;
+        }
+
+        .metric-value {
+            font-family: 'Orbitron', monospace;
+            font-weight: 700;
+            background: linear-gradient(45deg, var(--neon-green), var(--neon-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 20px currentColor;
+        }
+
         .btn {
-            background: linear-gradient(45deg, #00ff00, #00cc00, #00aa00);
-            border: none; color: #000; padding: 12px 20px; margin: 8px 0;
-            border-radius: 8px; cursor: pointer; font-family: inherit;
-            font-weight: bold; font-size: 14px; transition: all 0.3s;
-            box-shadow: 0 4px 15px #00ff0040; width: 100%;
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.15), rgba(0, 255, 136, 0.05));
+            border: 1px solid rgba(0, 255, 136, 0.4);
+            color: var(--neon-green);
+            padding: 12px 20px;
+            margin: 6px 4px 6px 0;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Fira Code', monospace;
+            font-size: 12px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
         }
-        .btn:hover { 
-            transform: translateY(-2px) scale(1.02); 
-            box-shadow: 0 8px 25px #00ff0070; 
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
         }
-        .btn-danger { background: linear-gradient(45deg, #ff0040, #cc0033, #aa0022); }
-        #info-panel {
-            position: absolute; bottom: 10px; left: 10px; right: 10px;
-            background: rgba(0,0,0,0.97); border: 2px solid #00ff00;
-            padding: 25px; border-radius: 15px; max-height: 28vh;
-            overflow-y: auto; backdrop-filter: blur(25px);
-            box-shadow: 0 0 50px #00ff0090; display: block;
+
+        .btn:hover::before {
+            left: 100%;
         }
-        #terminal {
-            background: rgba(0,25,0,0.98); border: 1px solid #00aa00;
-            height: 220px; padding: 20px; overflow-y: auto; margin-top: 15px;
-            font-size: 13px; line-height: 1.5; border-radius: 10px;
+
+        .btn:hover {
+            border-color: var(--neon-purple);
+            color: var(--neon-purple);
+            box-shadow: 0 0 30px rgba(255, 0, 255, 0.4);
+            transform: translateY(-2px);
         }
-        .terminal-line { margin-bottom: 4px; }
-        .terminal-time { color: #00cc44; font-weight: bold; }
-        .terminal-success { color: #00ff88; }
-        .terminal-error { color: #ff6666; }
-        .terminal-warning { color: #ffcc44; }
-        .terminal-device { color: #66ccff; }
-        .toggle-btn {
-            position: absolute; background: rgba(0,255,0,0.85);
-            border: none; color: #000; padding: 12px; cursor: pointer;
-            font-weight: bold; border-radius: 50%; box-shadow: 0 0 20px #00ff0060;
-            transition: all 0.3s;
+
+        .btn.active {
+            background: linear-gradient(135deg, rgba(255, 0, 255, 0.2), rgba(255, 0, 255, 0.1));
+            border-color: var(--neon-purple);
+            color: var(--neon-purple);
+            box-shadow: 0 0 40px rgba(255, 0, 255, 0.6);
         }
-        #toggle-info { top: 15px; right: 15px; }
-        #toggle-terminal { bottom: 250px; right: 25px; }
-        .scan-result {
-            background: rgba(0,100,0,0.3); padding: 15px; margin: 10px 0;
-            border-left: 5px solid #00ff88; border-radius: 8px;
+
+        #trace-log {
+            height: 160px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid rgba(0, 255, 136, 0.2);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'Fira Code', monospace;
+            font-size: 11px;
+            line-height: 1.4;
+            margin-top: 12px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--neon-green) transparent;
+        }
+
+        #trace-log::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #trace-log::-webkit-scrollbar-thumb {
+            background: var(--neon-green);
+            border-radius: 3px;
+        }
+
+        .scanline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                var(--neon-green) 25%, 
+                var(--neon-purple) 50%, 
+                var(--neon-blue) 75%, 
+                transparent 100%);
+            box-shadow: 0 0 20px currentColor;
+            z-index: 15;
+            animation: scan 4s linear infinite;
+            pointer-events: none;
+        }
+
+        @keyframes scan {
+            0% { transform: translateY(-100%); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(100vh); opacity: 0; }
+        }
+
+        .crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 20;
+            border: 2px solid var(--neon-green);
+            border-radius: 50%;
+            box-shadow: 0 0 20px var(--neon-green);
             animation: pulse 2s infinite;
         }
+
         @keyframes pulse {
-            0%,100% { box-shadow: 0 0 10px #00ff0040; }
-            50% { box-shadow: 0 0 25px #00ff0080; }
+            0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
         }
-        .device-info { font-size: 12px; color: #88ff88; }
-        .social-links a { color: #ff88ff; text-decoration: none; }
-        h2 { 
-            animation: glow 1.5s infinite; text-align: center; 
-            margin-bottom: 20px; text-shadow: 0 0 15px #00ff00;
+
+        .glitch {
+            position: fixed;
+            color: var(--neon-purple);
+            font-family: 'Fira Code', monospace;
+            font-size: 10px;
+            font-weight: 500;
+            pointer-events: none;
+            z-index: 25;
+            white-space: nowrap;
+            animation: glitch linear infinite;
         }
-        @keyframes glow { 
-            0%,100%{text-shadow:0 0 10px #00ff00,0 0 20px #00ff00;}
-            50%{text-shadow:0 0 20px #00ff00,0 0 40px #00ff00;}
+
+        @keyframes glitch {
+            0% { 
+                transform: translateY(-100vh) rotateX(0deg); 
+                opacity: 1; 
+            }
+            100% { 
+                transform: translateY(100vh) rotateX(720deg); 
+                opacity: 0; 
+            }
         }
-        .loading { color: #ffaa00; animation: blink 1s infinite; }
-        @keyframes blink { 50% { opacity: 0.3; } }
     </style>
 </head>
 <body>
-    <video id="video-bg" autoplay muted loop playsinline>
-        <source src="/ca63eccfcf11bcd02c1a900196de630f_720w.mp4" type="video/mp4">
-    </video>
-
-    <div id="map-container">
-        <div id="map"></div>
-        <div class="control-panel" id="control-panel">
-            <h2><i class="fas fa-skull-crossbones"></i> LIVE IP RECON</h2>
-            <button class="btn" onclick="startAutoScan()"><i class="fas fa-bolt"></i> AUTO SCAN</button>
-            <button class="btn" onclick="scanCurrentView()"><i class="fas fa-search-location"></i> SCAN VIEW</button>
-            <button class="btn" onclick="clearAll()"><i class="fas fa-broom"></i> CLEAR ALL</button>
-            <button class="btn btn-danger" onclick="toggleControls()"><i class="fas fa-cogs"></i> CONTROLS</button>
-        </div>
+    <div id="container">
+        <video id="bg-video" autoplay muted loop playsinline preload="auto">
+            <source src="/ca63eccfcf11bcd02c1a900196de630f_720w.mp4" type="video/mp4">
+        </video>
         
-        <button class="toggle-btn" id="toggle-info" onclick="toggleInfoPanel()" title="Toggle Info">
-            <i class="fas fa-info-circle"></i>
-        </button>
-        <button class="toggle-btn" id="toggle-terminal" onclick="toggleTerminal()" title="Toggle Terminal">
-            <i class="fas fa-terminal"></i>
-        </button>
+        <canvas id="renderer"></canvas>
+        
+        <div class="crosshair"></div>
 
-        <div id="info-panel">
-            <div id="info-content">
-                <div style="text-align:center; padding:20px; color:#00ff88;">
-                    <i class="fas fa-globe-americas fa-2x"></i><br><br>
-                    <strong>Move map to target area</strong><br>
-                    <small>Auto-scan triggers on movement • Real API powered</small>
+        <div class="hud">
+            <div class="panel" id="command-panel">
+                <h2 style="margin: 0 0 20px 0; font-family: 'Orbitron', monospace; font-size: 18px; text-align: center; letter-spacing: 2px;">
+                    ∞ INFINITE TRACEROUTE
+                </h2>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;">
+                    <button class="btn" id="start-trace">▶️ START INFINITE</button>
+                    <button class="btn" id="speed-btn">⚡ x1</button>
+                    <button class="btn" id="cluster-btn">🌐 CLUSTERS</button>
+                    <button class="btn" id="export-btn">💾 TOPOLOGY</button>
+                    <button class="btn" id="reset-btn">🔄 PURGE</button>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Status:</span>
+                    <span class="metric-value" id="status">IDLE</span>
                 </div>
             </div>
-            <div id="terminal"></div>
+
+            <div class="panel" id="metrics-panel">
+                <h3 style="margin: 0 0 16px 0; font-family: 'Orbitron', monospace; opacity: 0.8;">NETWORK METRICS</h3>
+                <div class="metric-row">
+                    <span class="metric-label">Total Hops:</span>
+                    <span class="metric-value" id="hop-count">0</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Clusters:</span>
+                    <span class="metric-value" id="cluster-count">0</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Max RTT:</span>
+                    <span class="metric-value" id="max-rtt">0ms</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Density:</span>
+                    <span class="metric-value" id="density">0%</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">Peak Load:</span>
+                    <span class="metric-value" id="load">0 nodes</span>
+                </div>
+            </div>
+
+            <div class="panel" id="trace-panel">
+                <h3 style="margin: 0 0 12px 0; font-family: 'Orbitron', monospace; font-size: 14px;">LIVE PACKET TRACE</h3>
+                <div id="trace-log"></div>
+            </div>
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // Configuration
-        const API_BASE = '/api'; // Vercel backend endpoint
-        let map, markers = L.layerGroup(), scanning = false, scanInterval;
-        const logLines = [], findings = [];
-
-        // Initialize
-        async function init() {
-            initMap();
-            await preloadVideo();
-            log('HackerAI Recon Scanner v2.0 initialized', 'success');
-            log('Backend API: ' + API_BASE, 'info');
-            log('Move map + AUTO SCAN for live discovery', 'warning');
-        }
-
-        function initMap() {
-            map = L.map('map').setView([37.7749, -122.4194], 10); // SF default
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '© OpenStreetMap contributors'
-            }).addTo(map);
-            markers.addTo(map);
-            map.on('moveend zoomend', onMapMove);
-        }
-
-        async function preloadVideo() {
-            const video = document.getElementById('video-bg');
-            video.play().catch(() => {}); // Autoplay policy
-        }
-
-        // Real API calls to backend
-        async function scanIPRange(bounds) {
-            try {
-                const res = await fetch(`${API_BASE}/scan`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({bounds: [bounds.getSouth(), bounds.getWest(), bounds.getNorth(), bounds.getEast()]})
+        class InfiniteTracerouteEngine {
+            constructor() {
+                this.canvas = document.getElementById('renderer');
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 100000);
+                this.renderer = new THREE.WebGLRenderer({ 
+                    canvas: this.canvas, 
+                    antialias: true, 
+                    powerPreference: "high-performance",
+                    alpha: true 
                 });
-                return await res.json();
-            } catch(e) {
-                log('API Error: ' + e.message, 'error');
-                return generateFallbackData(bounds);
+                
+                // Core state
+                this.hops = [];
+                this.clusters = [];
+                this.connections = [];
+                this.totalHops = 0;
+                this.isTracing = false;
+                this.speedMultiplier = 1;
+                this.enableClustering = false;
+                
+                // Animation
+                this.clock = new THREE.Clock();
+                this.particles = [];
+                
+                this.init();
+                this.setupEventHandlers();
+                this.createEnvironment();
+                this.startRenderLoop();
+                this.initVisualEffects();
             }
-        }
 
-        function generateFallbackData(bounds) {
-            // Real recon simulation when API unavailable
-            const ips = [];
-            for(let i = 0; i < 12; i++) {
-                const lat = bounds.getSouth() + Math.random() * (bounds.getNorth() - bounds.getSouth());
-                const lng = bounds.getWest() + Math.random() * (bounds.getEast() - bounds.getWest());
-                ips.push({
-                    ip: `${Math.floor(192+Math.random()*64)}.${Math.floor(Math.random()*256)}.${Math.floor(Math.random()*256)}.${Math.floor(Math.random()*256)}`,
-                    lat, lng, ports: getRealisticPorts(), device: getDeviceType(), social: getSocialMedia()
+            init() {
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setClearColor(0x05050a, 0.0);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                
+                this.camera.position.set(0, 200, 1800);
+                
+                // Responsive
+                window.addEventListener('resize', () => this.onResize());
+            }
+
+            createEnvironment() {
+                // Dynamic lighting system
+                const ambient = new THREE.AmbientLight(0x2a2a44, 0.3);
+                this.scene.add(ambient);
+
+                const tracerLight = new THREE.PointLight(0x00ff88, 2, 8000);
+                tracerLight.position.set(2000, 1000, 2000);
+                tracerLight.castShadow = true;
+                this.scene.add(tracerLight);
+
+                const pulseLight = new THREE.PointLight(0xff00ff, 1.5, 6000);
+                pulseLight.position.set(-1500, -800, -1200);
+                this.scene.add(pulseLight);
+            }
+
+            setupEventHandlers() {
+                // UI Controls
+                document.getElementById('start-trace').onclick = () => this.toggleTracing();
+                document.getElementById('speed-btn').onclick = () => this.cycleSpeed();
+                document.getElementById('cluster-btn').onclick = () => this.toggleClustering();
+                document.getElementById('export-btn').onclick = () => this.exportTopology();
+                document.getElementById('reset-btn').onclick = () => this.resetNetwork();
+
+                // Mouse interaction
+                let mouseX = 0, mouseY = 0;
+                document.addEventListener('mousemove', (e) => {
+                    mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+                    mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+                    this.camera.position.x += (mouseX * 500 - this.camera.position.x * 0.1) * 0.02;
+                    this.camera.position.y += (mouseY * 300 - this.camera.position.y * 0.1) * 0.02;
+                });
+
+                document.addEventListener('click', () => this.createImpactEffect());
+            }
+
+            generateNetworkHop() {
+                const hop = {
+                    id: this.totalHops++,
+                    position: this.computeOrbitalPosition(),
+                    rtt: (this.totalHops * 0.3 + (Math.random() - 0.5) * 80 + 15).toFixed(1),
+                    asn: `AS${(Math.random() * 85000 + 15000).toFixed(0)}`,
+                    geo: this.getRandomGeoTag(),
+                    mesh: null,
+                    glow: 0,
+                    connections: []
+                };
+
+                // Advanced node geometry
+                const nodeGeo = new THREE.OctahedronGeometry(3, 1);
+                const nodeMat = new THREE.MeshPhongMaterial({
+                    color: 0x00ff88,
+                    shininess: 120,
+                    specular: 0xffffff,
+                    transparent: true,
+                    opacity: 0.9
+                });
+                
+                const node = new THREE.Mesh(nodeGeo, nodeMat);
+                node.position.copy(hop.position);
+                node.castShadow = true;
+                node.userData = hop;
+                
+                this.scene.add(node);
+                hop.mesh = node;
+                this.hops.push(hop);
+
+                // Intelligent peering
+                this.establishPeering(hop);
+                
+                // Cluster analysis
+                if (this.enableClustering) {
+                    this.analyzeClustering(hop);
+                }
+
+                this.logTraceEvent(hop);
+                this.updateMetrics();
+            }
+
+            computeOrbitalPosition() {
+                const radius = 400 + Math.cbrt(this.totalHops) * 80;
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(Math.random() * 2 - 1);
+                
+                return new THREE.Vector3(
+                    radius * Math.sin(phi) * Math.cos(theta),
+                    radius * Math.sin(phi) * Math.sin(theta) * 0.7,
+                    radius * Math.cos(phi)
+                );
+            }
+
+            getRandomGeoTag() {
+                const tags = ['US-W', 'CN-N', 'EU-DE', 'JP-TK', 'SG-SG', 'AU-SY', 'BR-SP', 'IN-MU', 'RU-MS', 'NL-AMS'];
+                return tags[Math.floor(Math.random() * tags.length)];
+            }
+
+            establishPeering(hop) {
+                // Connect to 2-6 strategic peers
+                const candidates = this.hops.slice(-50).filter(h => h !== hop);
+                const peers = candidates
+                    .sort((a, b) => hop.position.distanceTo(a.position) - hop.position.distanceTo(b.position))
+                    .slice(0, Math.floor(Math.random() * 5) + 2);
+
+                peers.forEach(peer => {
+                    this.createFiberConnection(hop, peer);
                 });
             }
-            return ips;
-        }
 
-        function getRealisticPorts() {
-            const ports = {80:'HTTP',443:'HTTPS',22:'SSH',8080:'HTTP-ALT',8443:'HTTPS-ALT'};
-            return Object.keys(ports).filter(() => Math.random() > 0.6).map(p => `${p}/${ports[p]}`);
-        }
+            createFiberConnection(hop1, hop2) {
+                const curve = new THREE.CatmullRomCurve3([
+                    hop1.position,
+                    hop1.position.clone().lerp(hop2.position, 0.3).add(new THREE.Vector3(
+                        (Math.random() - 0.5) * 80,
+                        Math.random() * 120,
+                        (Math.random() - 0.5) * 80
+                    )),
+                    hop2.position.clone().lerp(hop1.position, 0.3).add(new THREE.Vector3(
+                        (Math.random() - 0.5) * 80,
+                        -Math.random() * 120,
+                        (Math.random() - 0.5) * 80
+                    )),
+                    hop2.position
+                ]);
 
-        function getDeviceType() {
-            const devices = ['Linux Server','Windows Server','IoT Device','Router','NAS','Camera','Mobile'];
-            return devices[Math.floor(Math.random()*devices.length)];
-        }
+                const points = curve.getPoints(64);
+                const geo = new THREE.BufferGeometry().setFromPoints(points);
+                
+                const mat = new THREE.LineBasicMaterial({
+                    color: new THREE.Color().setHSL(0.33 - parseFloat(hop1.rtt) / 1000, 1, 0.6),
+                    transparent: true,
+                    opacity: 0.5,
+                    linewidth: 2
+                });
 
-        function getSocialMedia() {
-            const social = Math.random() > 0.8 ? ['twitter.com/user123','linkedin.com/in/test'] : [];
-            return social;
-        }
+                const fiber = new THREE.Line(geo, mat);
+                this.scene.add(fiber);
+                this.connections.push(fiber);
+            }
 
-        // Terminal System
-        function log(msg, type = 'info') {
-            const time = new Date().toLocaleTimeString();
-            const line = `<div class="terminal-line">
-                <span class="terminal-time">${time}</span> 
-                <span class="terminal-${type}"> ${msg}</span>
-            </div>`;
-            logLines.push(line);
-            if (logLines.length > 150) logLines.shift();
-            
-            const term = document.getElementById('terminal');
-            term.innerHTML = logLines.join('');
-            term.scrollTop = term.scrollHeight;
-        }
+            analyzeClustering(hop) {
+                const clusterRadius = 450;
+                for (let cluster of this.clusters) {
+                    if (hop.position.distanceTo(cluster.center) < clusterRadius && cluster.nodes.length < 25) {
+                        cluster.nodes.push(hop);
+                        cluster.mesh.scale.multiplyScalar(1.015);
+                        return;
+                    }
+                }
+                
+                if (Math.random() < 0.08) {
+                    this.spawnCluster(hop.position.clone());
+                }
+            }
 
-        // UI Controls
-        function toggleInfoPanel() {
-            const panel = document.getElementById('info-panel');
-            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-        }
-        function toggleTerminal() {
-            const term = document.getElementById('terminal');
-            term.style.display = term.style.display === 'none' ? 'block' : 'none';
-        }
-        function toggleControls() {
-            const panel = document.getElementById('control-panel');
-            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-        }
+            spawnCluster(center) {
+                const clusterGeo = new THREE.IcosahedronGeometry(18, 1);
+                const clusterMat = new THREE.MeshPhongMaterial({
+                    color: 0x00ccff,
+                    transparent: true,
+                    opacity: 0.4,
+                    wireframe: true
+                });
+                
+                const clusterMesh = new THREE.Mesh(clusterGeo, clusterMat);
+                clusterMesh.position.copy(center);
+                this.scene.add(clusterMesh);
+                
+                this.clusters.push({
+                    center,
+                    nodes: [],
+                    mesh: clusterMesh,
+                    density: 0
+                });
+            }
 
-        async function onMapMove() {
-            log(`Map moved to: ${map.getCenter().toString()}`, 'info');
-            if (scanning) {
-                clearInterval(scanInterval);
-                startAutoScan();
+            toggleTracing() {
+                if (this.isTracing) {
+                    clearInterval(this.traceInterval);
+                    this.isTracing = false;
+                    document.getElementById('start-trace').textContent = '▶️ START INFINITE';
+                    document.getElementById('start-trace').classList.remove('active');
+                    document.getElementById('status').textContent = 'PAUSED';
+                } else {
+                    this.traceInterval = setInterval(() => {
+                        for (let i = 0; i < this.speedMultiplier; i++) {
+                            this.generateNetworkHop();
+                        }
+                    }, 45);
+                    this.isTracing = true;
+                    document.getElementById('start-trace').textContent = '⏸️ PAUSE TRACE';
+                    document.getElementById('start-trace').classList.add('active');
+                    document.getElementById('status').textContent = 'TRACING ∞';
+                }
+            }
+
+            cycleSpeed() {
+                const speeds = [1, 4, 12, 25];
+                const idx = speeds.indexOf(this.speedMultiplier);
+                this.speedMultiplier = speeds[(idx + 1) % speeds.length];
+                document.getElementById('speed-btn').textContent = `⚡ x${this.speedMultiplier}`;
+            }
+
+            toggleClustering() {
+                this.enableClustering = !this.enableClustering;
+                document.getElementById('cluster-btn').classList.toggle('active', this.enableClustering);
+            }
+
+            exportTopology() {
+                const topology = {
+                    timestamp: new Date().toISOString(),
+                    totalHops: this.totalHops,
+                    clusters: this.clusters.length,
+                    hops: this.hops.slice(-5000).map(h => ({
+                        id: h.id,
+                        position: [h.position.x, h.position.y, h.position.z],
+                        rtt: h.rtt,
+                        asn: h.asn,
+                        geo: h.geo
+                    }))
+                };
+                
+                const dataStr = JSON.stringify(topology, null, 2);
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `pentest-topology-${Date.now()}.json`;
+                link.click();
+            }
+
+            resetNetwork() {
+                this.hops.forEach(hop => {
+                    if (hop.mesh) this.scene.remove(hop.mesh);
+                    hop.connections.forEach(conn => this.scene.remove(conn));
+                });
+                this.clusters.forEach(c => {
+                    if (c.mesh) this.scene.remove(c.mesh);
+                });
+                
+                this.hops = [];
+                this.clusters = [];
+                this.connections = [];
+                this.totalHops = 0;
+                this.updateMetrics();
+                document.getElementById('status').textContent = 'RESET';
+            }
+
+            logTraceEvent(hop) {
+                const log = document.getElementById('trace-log');
+                const entry = `[${hop.id.toString().padStart(5,'0')}] ${hop.asn} ${hop.rtt}ms ${hop.geo}`;
+                log.innerHTML = entry + '<br>' + log.innerHTML;
+                
+                if (log.children.length > 80) {
+                    log.innerHTML = log.innerHTML.substring(0, log.innerHTML.lastIndexOf('<br>', 2000) + 4) + log.innerHTML.substring(log.innerHTML.lastIndexOf('<br>', 4000));
+                }
+            }
+
+            updateMetrics() {
+                document.getElementById('hop-count').textContent = this.totalHops.toLocaleString();
+                document.getElementById('cluster-count').textContent = this.clusters.length;
+                document.getElementById('max-rtt').textContent = this.hops.length ? 
+                    Math.max(...this.hops.map(h => parseFloat(h.rtt))).toFixed(0) + 'ms' : '0ms';
+                document.getElementById('density').textContent = ((this.totalHops / 50000) * 100).toFixed(1) + '%';
+                document.getElementById('load').textContent = this.hops.length.toLocaleString() + ' nodes';
+            }
+
+            createImpactEffect() {
+                for (let i = 0; i < 35; i++) {
+                    const particle = new THREE.Mesh(
+                        new THREE.SphereGeometry(1.5, 4, 4),
+                        new THREE.MeshBasicMaterial({ 
+                            color: new THREE.Color().setHSL(Math.random(), 1, 0.8),
+                            transparent: true 
+                        })
+                    );
+                    particle.position.copy(this.camera.position);
+                    particle.velocity = new THREE.Vector3(
+                        (Math.random() - 0.5) * 600,
+                        (Math.random() - 0.5) * 600,
+                        (Math.random() - 0.5) * 600
+                    );
+                    this.scene.add(particle);
+                    this.particles.push({ mesh: particle, life: 1.0, maxLife: 1.2 });
+                }
+            }
+
+            updateVisuals(delta) {
+                // Node pulsing
+                this.hops.forEach((hop, idx) => {
+                    if (hop.mesh) {
+                        hop.glow += delta * 4;
+                        hop.mesh.rotation.y += delta * 1.8 + idx * 0.01;
+                        hop.mesh.rotation.z += delta * 0.9;
+                        hop.mesh.scale.setScalar(1 + Math.sin(hop.glow) * 0.25);
+                        
+                        const rttColor = Math.max(0.15, 0.45 - parseFloat(hop.rtt) / 1200);
+                        hop.mesh.material.color.setHSL(rttColor, 1, 0.6);
+                    }
+                });
+
+                // Cluster rotation
+                this.clusters.forEach(cluster => {
+                    if (cluster.mesh) {
+                        cluster.mesh.rotation.x += delta * 0.8;
+                        cluster.mesh.rotation.y += delta * 1.2;
+                    }
+                });
+
+                // Fiber optic glow
+                this.connections.forEach((conn, idx) => {
+                    conn.material.opacity = 0.35 + Math.sin(Date.now() * 0.001 + idx * 0.1) * 0.25;
+                });
+
+                // Particle system
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    const p = this.particles[i];
+                    p.life -= delta;
+                    p.mesh.material.opacity = p.life / p.maxLife;
+                    p.mesh.position.add(p.velocity.clone().multiplyScalar(delta));
+                    p.velocity.multiplyScalar(0.98);
+                    
+                    if (p.life <= 0) {
+                        this.scene.remove(p.mesh);
+                        this.particles.splice(i, 1);
+                    }
+                }
+
+                // Auto camera adjustment
+                if (this.hops.length > 10) {
+                    const center = new THREE.Vector3();
+                    this.hops.slice(-100).forEach(h => center.add(h.position));
+                    center.divideScalar(100);
+                    this.camera.lookAt(center);
+                    
+                    const distance = center.length() * 1.4 + 1200;
+                    this.camera.position.lerp(center.clone().normalize().multiplyScalar(distance), 0.02);
+                }
+            }
+
+            onResize() {
+                this.camera.aspect = window.innerWidth / window.innerHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            initVisualEffects() {
+                // Continuous scanlines
+                setInterval(() => {
+                    const scanline = document.createElement('div');
+                    scanline.className = 'scanline';
+                    document.body.appendChild(scanline);
+                    setTimeout(() => scanline.remove(), 4000);
+                }, 1200);
+
+                // Glitch stream
+                setInterval(() => {
+                    if (Math.random() < 0.4) {
+                        const glitch = document.createElement('div');
+                        glitch.className = 'glitch';
+                        glitch.textContent = `TRC[${Math.random().toString(36).substr(2,6).toUpperCase()}]`;
+                        glitch.style.left = Math.random() * 100 + '%';
+                        glitch.style.animationDuration = (2 + Math.random() * 3) + 's';
+                        document.body.appendChild(glitch);
+                        setTimeout(() => glitch.remove(), 5000);
+                    }
+                }, 150);
+
+                // Video optimization
+                const video = document.getElementById('bg-video');
+                video.play().catch(() => {});
+            }
+
+            startRenderLoop() {
+                const render = () => {
+                    requestAnimationFrame(render);
+                    const delta = this.clock.getDelta();
+                    this.updateVisuals(delta);
+                    this.renderer.render(this.scene, this.camera);
+                };
+                render();
             }
         }
 
-        async function processScanResult(data) {
-            for (const target of data) {
-                const marker = L.marker([target.lat, target.lng]).bindPopup(`
-                    <div style="font-family:monospace; min-width:250px;">
-                        <strong style="color:#00ff88;">${target.ip}</strong><br>
-                        <span style="color:#66ccff;">${target.device}</span><br>
-                        ${target.ports.map(p => `<div style="color:#ffaa00;">● ${p}</div>`).join('')}<br>
-                        ${target.social.length ? target.social.map(s => `<a href="${s}" target="_blank">📱 ${s}</a>`).join('<br>') : ''}
-                    </div>
-                `);
-                markers.addLayer(marker);
-
-                addToInfoPanel(target);
-                log(`🎯 ${target.ip} | ${target.ports.join(',')} | ${target.device}`, 'success');
-            }
-        }
-
-        function addToInfoPanel(target) {
-            const content = document.getElementById('info-content');
-            content.innerHTML += `
-                <div class="scan-result">
-                    <strong style="color:#00ff88;">${target.ip}</strong> 
-                    <span class="device-info">${target.device}</span><br>
-                    <div style="color:#ffaa00; font-size:12px;">${target.ports.join(' ')}</div>
-                    ${target.social.length ? `<div style="color:#ff88ff;">${target.social.join(' ')}</div>` : ''}
-                </div>
-            `;
-            content.scrollTop = content.scrollHeight;
-        }
-
-        // Main scan functions
-        async function scanCurrentView() {
-            log('🔍 Scanning current viewport via API...', 'warning');
-            const bounds = map.getBounds();
-            const data = await scanIPRange(bounds);
-            await processScanResult(data);
-            log(`✅ Scan complete: ${data.length} targets discovered`, 'success');
-        }
-
-        async function startAutoScan() {
-            if (scanning) return;
-            scanning = true;
-            log('⚡ AUTO-SCAN ACTIVATED - Continuous real-time discovery', 'warning');
-            
-            scanInterval = setInterval(async () => {
-                const bounds = map.getBounds();
-                const data = await scanIPRange(bounds);
-                processScanResult(data.slice(0, 6)); // Rate limit
-            }, 4000);
-        }
-
-        function clearAll() {
-            markers.clearLayers();
-            document.getElementById('info-content').innerHTML = '<div style="text-align:center;padding:30px;color:#00ff88;"><i class="fas fa-check"></i> Cleared. Ready for new recon.</div>';
-            logLines.length = 0;
-            document.getElementById('terminal').innerHTML = '';
-            log('🧹 All data cleared', 'info');
-        }
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', e => {
-            if (e.key === ' ') scanCurrentView();
-            if (e.key === 's' || e.key === 'S') startAutoScan();
-            if (e.key === 'c' || e.key === 'C') clearAll();
-        });
-
-        // Auto-init
-        init();
+        // Initialize production engine
+        const traceroute = new InfiniteTracerouteEngine();
+        window.traceroute = traceroute;
     </script>
 </body>
 </html>
